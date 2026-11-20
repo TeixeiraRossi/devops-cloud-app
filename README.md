@@ -21,3 +21,50 @@ A imagem `estacao-jogavel:1.0` também pode ser gerada na raiz com `docker build
 | `GET /ready` | Verifica se MySQL e Redis respondem |
 
 A configuração é fornecida por `PORT`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` e `REDIS_URL`. A API cria a tabela `jogos` no primeiro acesso ao banco.
+
+## Kubernetes no Docker Desktop (kubeadm)
+
+Na área **Kubernetes** do Docker Desktop, habilite ou crie um cluster **kubeadm**. No terminal, selecione o contexto local e confira se o nó está `Ready` e existe uma StorageClass padrão para o PVC do MySQL.
+
+```sh
+kubectl config use-context docker-desktop
+kubectl get nodes
+kubectl get storageclass
+```
+
+Na raiz do repositório, gere a imagem com a mesma tag do Deployment (ou reaproveite a imagem criada pelo Compose) e aplique os manifestos. A API usa a imagem local quando ela está disponível no nó, graças a `IfNotPresent`.
+
+```sh
+docker build -t estacao-jogavel:1.0 app
+kubectl apply -f k8s/
+kubectl -n n3-guilherme rollout status deployment/api --timeout=180s
+kubectl -n n3-guilherme get all
+kubectl -n n3-guilherme get pvc
+kubectl -n n3-guilherme describe deployment api
+```
+
+O Service `api` tem uma porta externa atribuída pelo cluster. Confira o valor e acesse `http://localhost:<NODE_PORT>`. Se o NodePort não responder no Mac, faça o encaminhamento abaixo e abra http://localhost:8080 enquanto o comando estiver rodando.
+
+```sh
+kubectl -n n3-guilherme get service api
+kubectl -n n3-guilherme port-forward service/api 8080:3000
+```
+
+A readiness em `/ready` espera MySQL e Redis antes de o Service encaminhar tráfego ao pod. A liveness em `/health` só verifica se o processo HTTP está respondendo. O Deployment da API começa com duas réplicas. Os valores de CPU e memória são um ponto de partida para a prática e podem ser ajustados depois de medir a aplicação.
+
+### Prova de persistência
+
+1. Abra a loja pelo Service e cadastre um jogo de teste. O MySQL do Kubernetes tem seu próprio armazenamento, então cadastre um registro novo mesmo se já houver um no Compose.
+2. Guarde a saída de `get pods` e da consulta abaixo. Apague **apenas o pod** do banco.
+3. Confirme visualmente que há um pod com **novo nome** e aguarde até ficar `1/1 Ready`. Repita a consulta SQL e guarde a saída com o mesmo ID e título. A consulta direta ao MySQL evita usar o cache do Redis como prova.
+
+```sh
+kubectl -n n3-guilherme get pods -l app=mysql
+kubectl -n n3-guilherme exec deployment/mysql -- sh -ec 'MYSQL_PWD="$MYSQL_PASSWORD" mysql -h 127.0.0.1 -u "$MYSQL_USER" "$MYSQL_DATABASE" -e "SELECT id, titulo FROM jogos ORDER BY id DESC LIMIT 5;"'
+kubectl -n n3-guilherme delete pod -l app=mysql
+kubectl -n n3-guilherme get pods -l app=mysql -w
+```
+
+O MySQL usa uma réplica e a estratégia `Recreate` para evitar sobreposição durante atualizações do Deployment. O pod novo usa o mesmo PVC `mysql-dados`. O Redis pode iniciar vazio, pois o catálogo é reconstruído a partir do MySQL.
+
+Se o pod da API ficar em `ImagePullBackOff`, confira o contexto do Docker, a tag com `docker image inspect estacao-jogavel:1.0` e os eventos do pod com `kubectl -n n3-guilherme describe pod <POD_API>`. Em um cluster remoto, coloque a imagem em um registro acessível e ajuste a referência no Deployment.

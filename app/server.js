@@ -2,6 +2,15 @@ const express = require('express');
 const mysql = require('mysql2/promise');
 const { createClient } = require('redis');
 const path = require('node:path');
+const { readFileSync } = require('node:fs');
+
+const publicDir = path.join(__dirname, 'public');
+const versao = process.env.APP_VERSION ?? '1.0';
+if (!/^\d+\.\d+$/.test(versao)) {
+  throw new Error('APP_VERSION deve seguir o formato 1.0 ou 2.0.');
+}
+const pagina = readFileSync(path.join(publicDir, 'index.html'), 'utf8')
+  .replace('{{VERSAO}}', versao);
 
 const app = express();
 const db = mysql.createPool({
@@ -44,7 +53,7 @@ async function prepareSchema() {
 app.disable('x-powered-by');
 app.use(express.json({ limit: '16kb' }));
 
-app.get('/health', (_req, res) => res.json({ status: 'ok', versao: '1.0' }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', versao }));
 
 app.get('/ready', async (_req, res) => {
   try {
@@ -101,7 +110,10 @@ app.post('/jogos', async (req, res) => {
   res.status(201).json({ id: resultado.insertId });
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.get(['/', '/index.html'], (_req, res) => {
+  res.set('Cache-Control', 'no-store').type('html').send(pagina);
+});
+app.use(express.static(publicDir));
 
 app.use((error, _req, res, _next) => {
   if (error.type === 'entity.parse.failed') return res.status(400).json({ erro: 'JSON inválido.' });

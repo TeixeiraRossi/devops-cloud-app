@@ -68,3 +68,7 @@ kubectl -n n3-guilherme get pods -l app=mysql -w
 O MySQL usa uma réplica e a estratégia `Recreate` para evitar sobreposição durante atualizações do Deployment. O pod novo usa o mesmo PVC `mysql-dados`. O Redis pode iniciar vazio, pois o catálogo é reconstruído a partir do MySQL.
 
 Se o pod da API ficar em `ImagePullBackOff`, confira o contexto do Docker, a tag com `docker image inspect estacao-jogavel:1.0` e os eventos do pod com `kubectl -n n3-guilherme describe pod <POD_API>`. Em um cluster remoto, coloque a imagem em um registro acessível e ajuste a referência no Deployment.
+
+## Exercícios de operação
+
+O [roteiro de comandos](comandos.md) mostra como começar pela escala manual e executar o rollout da imagem `2.0`.

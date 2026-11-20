@@ -5,6 +5,7 @@ header { background: #161f2e; border-bottom: 1px solid #2b3b50; }
 .largura { width: min(1080px, calc(100% - 2rem)); margin-inline: auto; }
 .barra, nav { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
 .barra { justify-content: space-between; min-height: 4rem; padding: .75rem 0; }
+.versao { margin-inline-start: .4rem; padding: .15rem .45rem; border: 1px solid #536783; border-radius: 6px; color: #94dcff; }
 a { color: #94dcff; }
 main { padding-block: 2rem 4rem; }
 section + section { margin-top: 3rem; }

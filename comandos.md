@@ -1,6 +1,6 @@
 # Operação do cluster
 
-Roteiro de execução da N3 no contexto `docker-desktop`, namespace `n3-guilherme`. Guarde as saídas reais no relatório. Os resultados descritos aqui são os critérios de validação.
+Roteiro de execução da N3 no contexto `docker-desktop`, namespace `n3-guilherme`. Guarde as saídas reais no relatório. Os passos 1 e 2 trazem o roteiro de execução. Os passos 3 a 6 também registram os resultados observados no laboratório.
 
 ## 1. Escala manual
 
@@ -49,3 +49,59 @@ Guarde o histórico e as respostas do monitor mostrando a transição. Se aparec
 ```sh
 kubectl -n n3-guilherme delete pod monitor-rollout
 ```
+
+## 3. Falha proposital e rollback
+
+```powershell
+kubectl -n n3-guilherme get deployment api -o wide
+kubectl -n n3-guilherme set image deployment/api api=estacao-jogavel:tag-inexistente-n3
+kubectl -n n3-guilherme get pods -l app=api -w
+kubectl -n n3-guilherme describe pod NOME_DO_POD_COM_ERRO
+kubectl -n n3-guilherme rollout undo deployment/api
+kubectl -n n3-guilherme rollout status deployment/api --timeout=180s
+kubectl -n n3-guilherme get deployment api -o wide
+```
+
+Saia do acompanhamento com Ctrl+C quando aparecer o erro e substitua `NOME_DO_POD_COM_ERRO` antes de executar o `describe`. Na execução registrada, o novo pod entrou em `ErrImagePull` e `ImagePullBackOff`, e as duas réplicas anteriores continuaram rodando. O rollback restaurou `estacao-jogavel:2.0` com `2/2` réplicas prontas.
+
+## 4. Requests e limits
+
+```powershell
+kubectl -n n3-guilherme set resources deployment/api -c api --requests=cpu=25m,memory=64Mi --limits=cpu=200m,memory=160Mi
+kubectl -n n3-guilherme rollout status deployment/api --timeout=180s
+kubectl -n n3-guilherme describe pods -l app=api
+```
+
+Os dois pods novos ficaram prontos. O `describe` confirmou requests de `25m` de CPU e `64Mi` de memória, e limits de `200m` e `160Mi`.
+
+## 5. Escala automática com HPA
+
+```powershell
+kubectl -n n3-guilherme top pods -l app=api
+kubectl -n n3-guilherme autoscale deployment api --min=2 --max=5 --cpu=60%
+kubectl -n n3-guilherme get hpa api -w
+```
+
+Em outro terminal, crie a carga. Depois de registrar o aumento de réplicas, remova o gerador.
+
+```powershell
+kubectl -n n3-guilherme create deployment carga-hpa --image=busybox:1.36 --replicas=2 -- sh -c 'while true; do wget -q -T 2 -O /dev/null http://api:3000/jogos || sleep 1; done'
+kubectl -n n3-guilherme delete deployment carga-hpa
+```
+
+Confirme o retorno ao mínimo.
+
+```powershell
+kubectl -n n3-guilherme get hpa api
+kubectl -n n3-guilherme get deployment api
+```
+
+O HPA registrou a sequência de 2, 4 e 5 réplicas e voltou a 2 após a remoção da carga. Na conferência final, registrou CPU de 4% e o Deployment estava com `2/2` prontas. A meta de 60% é relativa ao request de CPU de cada pod: com `25m`, equivale a `15m` em média por pod.
+
+## 6. Recursos do nó
+
+```powershell
+kubectl describe node docker-desktop
+```
+
+O nó apresentou 2 CPUs, memória total de `1950460Ki` em **Capacity** e `1848060Ki` disponíveis aos pods em **Allocatable**. **Allocated resources** mostrou requests agregados de `1020m` de CPU e `600Mi` de memória. Esses totais representam configuração dos pods, enquanto `kubectl top` mostra consumo medido.

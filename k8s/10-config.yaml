@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: loja-config
-  namespace: n3-guilherme
+  namespace: n3-guilherme-ana
 data:
   PORT: "3000"
   DB_HOST: mysql
@@ -15,7 +15,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: mysql-credenciais
-  namespace: n3-guilherme
+  namespace: n3-guilherme-ana
 type: Opaque
 stringData:
   # Valores fictícios usados no laboratório.

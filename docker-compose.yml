@@ -1,6 +1,6 @@
 services:
   api:
-    image: estacao-jogavel:1.0
+    image: lojinho:1.0
     build: ./app
     environment:
       PORT: 3000

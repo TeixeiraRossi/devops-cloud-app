@@ -23,13 +23,14 @@ function cartao(jogo) {
     imagem.src = jogo.capa;
     capa.replaceChildren(imagem);
   }
-  item.append(capa, elemento('div', '', 'detalhes'));
-  item.lastElementChild.append(
+  const detalhes = elemento('div', '', 'detalhes');
+  detalhes.append(
     elemento('p', [jogo.genero, jogo.plataforma].join(' · '), 'metadados'),
     elemento('h2', jogo.titulo),
     elemento('p', jogo.descricao),
     elemento('strong', moeda.format(Number(jogo.preco)), 'preco'),
   );
+  item.append(capa, detalhes);
   return item;
 }
 
